@@ -3,8 +3,9 @@ module Main(main) where
 import Data.Function((&))
 import Graphics.Gloss
 import Graphics.Gloss.Data.ViewPort
-import Graphics.Gloss.Interface.IO.Interact
+import Graphics.Gloss.Interface.IO.Game
 import qualified Data.Map.Strict as Map
+import System.Random
 
 width, height, offset, pixelSize :: Int
 width = 350
@@ -20,7 +21,7 @@ background :: Color
 background = dark $ dark $ dark blue
 
 main :: IO ()
-main = play window background fps initialState draw handleEvents update
+main = playIO window background fps initialState draw handleEvents update
 
 type Grid = Map.Map (Int, Int) Bool
 
@@ -36,8 +37,8 @@ makeLookup :: [(Int, Int, Bool)] -> Map.Map (Int, Int) Bool
 makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
 
 
-draw :: GameOfLife -> Picture
-draw game = pictures (map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
+draw :: GameOfLife -> IO Picture
+draw game = return $ pictures (map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
 
 pixelColour True = white
 pixelColour False = black
@@ -65,6 +66,10 @@ renderEditMode game = []
 
 matrixToIndexed :: [[Bool]] -> [(Int, Int, Bool)]
 matrixToIndexed grid = map (\(i, j, x) -> (fromIntegral i, fromIntegral j, x)) ((zip [0..npixel] grid) >>= enumerateRow)
+
+indexList :: [Bool] -> [(Int, Int, Bool)]
+indexList list = zip [(i, j) | i <- [0..npixel], j <- [0..npixel]] list
+  & map (\((i, j), x) -> (i, j, x))
 
 initialGrid = makeLookup $ matrixToIndexed [
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
@@ -99,17 +104,22 @@ initialGrid = makeLookup $ matrixToIndexed [
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
   ]
 
+randomGrid gen = (randoms gen :: [Bool]) & take (30 * 30) & indexList & makeLookup
+
 initialState :: GameOfLife
 initialState = Game initialGrid True
 
-handleEvents :: Event -> GameOfLife -> GameOfLife
-handleEvents (EventKey (Char 'p') Down _ _) game = game { editMode = not (editMode game) }
-handleEvents (EventKey (Char 'r') Down _ _) game = game { grid = initialGrid }
-handleEvents (EventKey (MouseButton LeftButton) Down _ pos) game =
+handleEvents :: Event -> GameOfLife -> IO GameOfLife
+handleEvents (EventKey (Char 'p') Down _ _) game = return game { editMode = not (editMode game) }
+handleEvents (EventKey (Char 'r') Down _ _) game = return game { grid = initialGrid }
+handleEvents (EventKey (Char 't') Down _ _) game = do
+  g <- newStdGen
+  return game { grid = randomGrid g }
+handleEvents (EventKey (MouseButton LeftButton) Down _ pos) game = return $
   if (editMode game)
   then game { grid = doClick pos (grid game) }
   else game
-handleEvents _ game = game
+handleEvents _ game = return game
 
 doClick :: (Float, Float) -> Grid -> Grid
 doClick pos grid = newValue
@@ -118,8 +128,8 @@ doClick pos grid = newValue
           Just x -> Map.insert pixelPos (not x) grid
           Nothing -> grid
 
-
-update _ game = (updateLiveness) game
+update :: Float -> GameOfLife -> IO GameOfLife
+update _ game = return (updateLiveness game)
 
 updateLiveness game = if not (editMode game)
                       then game { grid = stepLiveness (grid game) }
