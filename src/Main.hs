@@ -22,25 +22,28 @@ background = dark $ dark $ dark blue
 main :: IO ()
 main = play window background fps initialState draw handleEvents update
 
+type Grid = Map.Map (Int, Int) Bool
+
 data GameOfLife = Game
-  { grid :: [(Int, Int, Bool)]
+  { grid :: Grid
   , editMode :: Bool
   } deriving Show
 
 enumerateRow :: (Int, [Bool]) -> [(Int, Int, Bool)]
 enumerateRow (j, row) = (flip map) (zip [0..npixel] row) (\(i, x) -> (i, j, x))
 
--- enumerateGrid :: [[Bool]] -> [(Int, Int, Bool)]
--- enumerateGrid grid = (zip [0..] grid) >>= enumerateRow
+makeLookup :: [(Int, Int, Bool)] -> Map.Map (Int, Int) Bool
+makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
+
 
 draw :: GameOfLife -> Picture
-draw game = pictures (map centerSquare $ map drawSquare (grid game) ++ renderEditMode game)
+draw game = pictures (map centerSquare $ map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
 
 pixelColour True = white
 pixelColour False = black
 
-drawSquare :: (Int, Int, Bool) -> Picture
-drawSquare (i, j, alive) = translate (fromIntegral ((fromIntegral i) * pixelSize))
+drawSquare :: ((Int, Int), Bool) -> Picture
+drawSquare ((i, j), alive) = translate (fromIntegral ((fromIntegral i) * pixelSize))
                                      (fromIntegral ((fromIntegral (npixel - j)) * pixelSize)) $
   color (pixelColour alive) $
   rectangleSolid (fromIntegral pixelSize) (fromIntegral pixelSize)
@@ -48,6 +51,7 @@ drawSquare (i, j, alive) = translate (fromIntegral ((fromIntegral i) * pixelSize
 renderEditMode :: GameOfLife -> [Picture]
 renderEditMode Game {editMode=True} = [text "Edit" & color white & translate (-30) 115 & scale 0.25 0.25]
 renderEditMode game = []
+
 matrixToIndexed :: [[Bool]] -> [(Int, Int, Bool)]
 matrixToIndexed grid = map (\(i, j, x) -> (fromIntegral i, fromIntegral j, x)) ((zip [0..npixel] grid) >>= enumerateRow)
 
@@ -55,7 +59,7 @@ centerSquare :: Picture -> Picture
 centerSquare = translate (-150) (-150)
 
 initialState :: GameOfLife
-initialState = Game (matrixToIndexed [
+initialState = Game (makeLookup $ matrixToIndexed [
   [False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True],
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
@@ -90,6 +94,7 @@ initialState = Game (matrixToIndexed [
 
 handleEvents :: Event -> GameOfLife -> GameOfLife
 handleEvents (EventKey (Char 'p') Down _ _) game = game { editMode = not (editMode game) }
+-- handleEvents (EventKey (MouseButton LeftButton) Down _ (x', y')) game =
 handleEvents _ game = game
 
 
@@ -99,11 +104,8 @@ updateLiveness game = if not (editMode game)
                       then game { grid = stepLiveness (grid game) }
                       else game
 
-makeLookup :: [(Int, Int, Bool)] -> Map.Map (Int, Int) Bool
-makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
-
-stepLiveness :: [(Int, Int, Bool)] -> [(Int, Int, Bool)]
-stepLiveness grid = map (alive (makeLookup grid)) grid
+stepLiveness :: Grid -> Grid
+stepLiveness grid = Map.mapWithKey (alive grid) grid
 
 existsAndAlive :: Maybe Bool -> Bool
 existsAndAlive (Just x) = x
@@ -124,9 +126,8 @@ livingNeighbours lookup (i, j) = neighbourPositions &
   map existsAndAlive &
   countTrue
 
--- TODO: handle i,j better
-alive :: Map.Map (Int, Int) Bool -> (Int, Int, Bool) -> (Int, Int, Bool)
-alive lookup (i, j, wasAlive) = (i, j, isAlive)
+alive :: Map.Map (Int, Int) Bool -> (Int, Int) -> Bool -> Bool
+alive lookup (i, j) wasAlive = isAlive
   where
     isAlive = (wasAlive && (nLivingNeighbours == 2 || nLivingNeighbours == 3)) ||
               ((not wasAlive) && nLivingNeighbours == 3)
