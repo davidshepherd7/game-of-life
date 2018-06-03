@@ -11,9 +11,11 @@ width, height, windowOffset, pixelSize :: Int
 windowOffset = 100
 fps = 2
 pixelSize = 10
-npixel = 30
-width = pixelSize * npixel + 50
+npixel = 100
+padding = 50
+width = pixelSize * npixel + padding
 height = width
+centeringFactor = ((fromIntegral height) / 2.0) - ((fromIntegral padding) / 2.0) :: Float
 
 
 window = InWindow "Conway" (width, height) (windowOffset, windowOffset)
@@ -43,14 +45,14 @@ data GameOfLife = Game
 
 pixelToPosition :: (Int, Int) -> (Float, Float)
 pixelToPosition (i, j) = (
-  fromIntegral (i * pixelSize) - 150,
-  fromIntegral ((npixel - j) * pixelSize) - 150
+  fromIntegral (i * pixelSize) - centeringFactor,
+  fromIntegral ((npixel - j) * pixelSize) - centeringFactor
   )
 
 positionToPixel :: (Float, Float) -> (Int, Int)
 positionToPixel (x, y) = (
-  round ((x + 150) / fromIntegral pixelSize),
-  npixel - (round ((y + 150) / fromIntegral pixelSize))
+  round ((x + centeringFactor) / fromIntegral pixelSize),
+  npixel - (round ((y + centeringFactor) / fromIntegral pixelSize))
   )
 
 
@@ -68,7 +70,8 @@ renderEditMode game = []
 
 
 listToGrid :: [Bool] -> Grid
-listToGrid list = list & take (30 * 31) & indexList & makeLookup
+  -- TODO: why npixel+1?
+listToGrid list = list & take (npixel * (npixel + 1)) & indexList & makeLookup
   where makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
         indicies = [(i, j) | i <- [0..npixel], j <- [0..npixel]]
         indexList list = zip indicies list & map (\((i, j), x) -> (i, j, x))
