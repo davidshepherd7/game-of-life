@@ -57,12 +57,14 @@ positionToPixel (x, y) = (
 
 
 draw :: GameOfLife -> IO Picture
-draw game = return $ pictures (map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
+draw game = return $ pictures (((Map.toList (grid game)) >>= drawPixel) ++ renderEditMode game)
 
-drawSquare :: ((Int, Int), Bool) -> Picture
-drawSquare ((i, j), alive) = rectangleSolid (fromIntegral pixelSize) (fromIntegral pixelSize) &
+drawInnerSquare ((i, j), alive) = rectangleSolid (fromIntegral (pixelSize - 1)) (fromIntegral (pixelSize - 1))&
   color (pixelColour alive) &
   uncurry translate (pixelToPosition (i, j))
+
+drawPixel :: ((Int, Int), Bool) -> [Picture]
+drawPixel p = [drawInnerSquare p]
 
 renderEditMode :: GameOfLife -> [Picture]
 renderEditMode Game {editMode=True} = [text "Edit" & color white & translate (-30) 115 & scale 0.25 0.25]
