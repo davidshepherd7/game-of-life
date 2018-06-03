@@ -7,18 +7,28 @@ import Graphics.Gloss.Interface.IO.Game
 import qualified Data.Map.Strict as Map
 import System.Random
 
-width, height, offset, pixelSize :: Int
-width = 350
-height = 350
-offset = 100
+width, height, windowOffset, pixelSize :: Int
+windowOffset = 100
 fps = 2
 pixelSize = 10
 npixel = 30
+width = pixelSize * npixel + 50
+height = width
 
-window = InWindow "Conway" (width, height) (offset, offset)
+
+window = InWindow "Conway" (width, height) (windowOffset, windowOffset)
 
 background :: Color
 background = dark $ dark $ dark blue
+
+pixelColour :: Bool -> Color
+pixelColour True = white
+pixelColour False = black
+
+initialGrid = cycle [False] & listToGrid
+
+initialState :: GameOfLife
+initialState = Game initialGrid True
 
 main :: IO ()
 main = playIO window background fps initialState draw handleEvents update
@@ -30,18 +40,6 @@ data GameOfLife = Game
   , editMode :: Bool
   } deriving Show
 
-enumerateRow :: (Int, [Bool]) -> [(Int, Int, Bool)]
-enumerateRow (j, row) = (flip map) (zip [0..npixel] row) (\(i, x) -> (i, j, x))
-
-makeLookup :: [(Int, Int, Bool)] -> Map.Map (Int, Int) Bool
-makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
-
-
-draw :: GameOfLife -> IO Picture
-draw game = return $ pictures (map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
-
-pixelColour True = white
-pixelColour False = black
 
 pixelToPosition :: (Int, Int) -> (Float, Float)
 pixelToPosition (i, j) = (
@@ -55,6 +53,10 @@ positionToPixel (x, y) = (
   npixel - (round ((y + 150) / fromIntegral pixelSize))
   )
 
+
+draw :: GameOfLife -> IO Picture
+draw game = return $ pictures (map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
+
 drawSquare :: ((Int, Int), Bool) -> Picture
 drawSquare ((i, j), alive) = rectangleSolid (fromIntegral pixelSize) (fromIntegral pixelSize) &
   color (pixelColour alive) &
@@ -64,50 +66,15 @@ renderEditMode :: GameOfLife -> [Picture]
 renderEditMode Game {editMode=True} = [text "Edit" & color white & translate (-30) 115 & scale 0.25 0.25]
 renderEditMode game = []
 
-matrixToIndexed :: [[Bool]] -> [(Int, Int, Bool)]
-matrixToIndexed grid = map (\(i, j, x) -> (fromIntegral i, fromIntegral j, x)) ((zip [0..npixel] grid) >>= enumerateRow)
 
-indexList :: [Bool] -> [(Int, Int, Bool)]
-indexList list = zip [(i, j) | i <- [0..npixel], j <- [0..npixel]] list
-  & map (\((i, j), x) -> (i, j, x))
+listToGrid :: [Bool] -> Grid
+listToGrid list = list & take (30 * 31) & indexList & makeLookup
+  where makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
+        indicies = [(i, j) | i <- [0..npixel], j <- [0..npixel]]
+        indexList list = zip indicies list & map (\((i, j), x) -> (i, j, x))
 
-initialGrid = makeLookup $ matrixToIndexed [
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False,  False,  False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False,  False,  False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False,  False,  False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False,  False,  False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
-  [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-  ]
 
-randomGrid gen = (randoms gen :: [Bool]) & take (30 * 30) & indexList & makeLookup
-
-initialState :: GameOfLife
-initialState = Game initialGrid True
+randomGrid gen = (randoms gen :: [Bool]) & listToGrid
 
 handleEvents :: Event -> GameOfLife -> IO GameOfLife
 handleEvents (EventKey (Char 'p') Down _ _) game = return game { editMode = not (editMode game) }
@@ -128,6 +95,8 @@ doClick pos grid = newValue
           Just x -> Map.insert pixelPos (not x) grid
           Nothing -> grid
 
+
+
 update :: Float -> GameOfLife -> IO GameOfLife
 update _ game = return (updateLiveness game)
 
@@ -147,8 +116,7 @@ countTrue xs = length $ filter id xs
 
 neighbourPositions = [(-1, -1), (-1,  0), (-1,  1),
                       ( 0, -1),           ( 0,  1),
-                      ( 1, -1), ( 1,  0), ( 1,  1)
-                      ]
+                      ( 1, -1), ( 1,  0), ( 1,  1)]
 
 livingNeighbours :: Map.Map (Int, Int) Bool -> (Int, Int) -> Int
 livingNeighbours lookup (i, j) = neighbourPositions &
