@@ -37,16 +37,27 @@ makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
 
 
 draw :: GameOfLife -> Picture
-draw game = pictures (map centerSquare $ map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
+draw game = pictures (map drawSquare (Map.toList (grid game)) ++ renderEditMode game)
 
 pixelColour True = white
 pixelColour False = black
 
+pixelToPosition :: (Int, Int) -> (Float, Float)
+pixelToPosition (i, j) = (
+  fromIntegral (i * pixelSize) - 150,
+  fromIntegral ((npixel - j) * pixelSize) - 150
+  )
+
+positionToPixel :: (Float, Float) -> (Int, Int)
+positionToPixel (x, y) = (
+  round ((x + 150) / fromIntegral pixelSize),
+  npixel - (round ((y + 150) / fromIntegral pixelSize))
+  )
+
 drawSquare :: ((Int, Int), Bool) -> Picture
-drawSquare ((i, j), alive) = translate (fromIntegral ((fromIntegral i) * pixelSize))
-                                     (fromIntegral ((fromIntegral (npixel - j)) * pixelSize)) $
-  color (pixelColour alive) $
-  rectangleSolid (fromIntegral pixelSize) (fromIntegral pixelSize)
+drawSquare ((i, j), alive) = rectangleSolid (fromIntegral pixelSize) (fromIntegral pixelSize) &
+  color (pixelColour alive) &
+  uncurry translate (pixelToPosition (i, j))
 
 renderEditMode :: GameOfLife -> [Picture]
 renderEditMode Game {editMode=True} = [text "Edit" & color white & translate (-30) 115 & scale 0.25 0.25]
@@ -54,9 +65,6 @@ renderEditMode game = []
 
 matrixToIndexed :: [[Bool]] -> [(Int, Int, Bool)]
 matrixToIndexed grid = map (\(i, j, x) -> (fromIntegral i, fromIntegral j, x)) ((zip [0..npixel] grid) >>= enumerateRow)
-
-centerSquare :: Picture -> Picture
-centerSquare = translate (-150) (-150)
 
 initialState :: GameOfLife
 initialState = Game (makeLookup $ matrixToIndexed [
@@ -94,8 +102,18 @@ initialState = Game (makeLookup $ matrixToIndexed [
 
 handleEvents :: Event -> GameOfLife -> GameOfLife
 handleEvents (EventKey (Char 'p') Down _ _) game = game { editMode = not (editMode game) }
--- handleEvents (EventKey (MouseButton LeftButton) Down _ (x', y')) game =
+handleEvents (EventKey (MouseButton LeftButton) Down _ pos) game =
+  if (editMode game)
+  then game { grid = doClick pos (grid game) }
+  else game
 handleEvents _ game = game
+
+doClick :: (Float, Float) -> Grid -> Grid
+doClick pos grid = newValue
+  where pixelPos = positionToPixel pos
+        newValue = case (Map.lookup pixelPos grid) of
+          Just x -> Map.insert pixelPos (not x) grid
+          Nothing -> grid
 
 
 update _ game = (updateLiveness) game
