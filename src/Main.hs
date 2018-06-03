@@ -23,8 +23,8 @@ main :: IO ()
 main = play window background fps initialState draw handleEvents update
 
 data GameOfLife = Game
-  {
-    grid :: [(Int, Int, Bool)]
+  { grid :: [(Int, Int, Bool)]
+  , editMode :: Bool
   } deriving Show
 
 enumerateRow :: (Int, [Bool]) -> [(Int, Int, Bool)]
@@ -34,7 +34,7 @@ enumerateRow (j, row) = (flip map) (zip [0..npixel] row) (\(i, x) -> (i, j, x))
 -- enumerateGrid grid = (zip [0..] grid) >>= enumerateRow
 
 draw :: GameOfLife -> Picture
-draw game = pictures $ map centerSquare $ map drawSquare (grid game)
+draw game = pictures (map centerSquare $ map drawSquare (grid game) ++ renderEditMode game)
 
 pixelColour True = white
 pixelColour False = black
@@ -45,6 +45,9 @@ drawSquare (i, j, alive) = translate (fromIntegral ((fromIntegral i) * pixelSize
   color (pixelColour alive) $
   rectangleSolid (fromIntegral pixelSize) (fromIntegral pixelSize)
 
+renderEditMode :: GameOfLife -> [Picture]
+renderEditMode Game {editMode=True} = [text "Edit" & color white & translate (-30) 115 & scale 0.25 0.25]
+renderEditMode game = []
 matrixToIndexed :: [[Bool]] -> [(Int, Int, Bool)]
 matrixToIndexed grid = map (\(i, j, x) -> (fromIntegral i, fromIntegral j, x)) ((zip [0..npixel] grid) >>= enumerateRow)
 
@@ -83,12 +86,18 @@ initialState = Game (matrixToIndexed [
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
   [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-  ])
+  ]) True
 
 handleEvents :: Event -> GameOfLife -> GameOfLife
+handleEvents (EventKey (Char 'p') Down _ _) game = game { editMode = not (editMode game) }
 handleEvents _ game = game
 
-update _ game = game { grid = stepLiveness (grid game)}
+
+update _ game = (updateLiveness) game
+
+updateLiveness game = if not (editMode game)
+                      then game { grid = stepLiveness (grid game) }
+                      else game
 
 makeLookup :: [(Int, Int, Bool)] -> Map.Map (Int, Int) Bool
 makeLookup grid = Map.fromList $ map (\(i, j, x) -> ((i, j), x)) grid
